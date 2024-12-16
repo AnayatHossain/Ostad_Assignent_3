@@ -13,7 +13,7 @@ class ProductListScreen extends StatefulWidget {
 }
 
 class _ProductListScreenState extends State<ProductListScreen> {
-  List<Product> productlist = [];
+  List<Product> productList = [];
   bool _getProductListInProgress = false;
 
   @override
@@ -26,35 +26,42 @@ class _ProductListScreenState extends State<ProductListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Product List'),
+        title: const Text('Product list'),
         actions: [
           IconButton(
-            onPressed: _getProductList,
+            onPressed: () {
+              _getProductList();
+            },
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _getProductList,
-        child: _getProductListInProgress
-            ? const Center(child: CircularProgressIndicator()) // Show loading indicator
-            : ListView.builder(
-          itemCount: productlist.length,
-          itemBuilder: (context, index) {
-            return ProductItem(
-              product: productlist[index], // Pass the product
-              onDelete: () {
-                final productId = productlist[index].id;
-                if (productId != null) {
-                  _deleteProduct(productId);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Error: Product ID is null.')),
-                  );
-                }
-              },
-            );
-          },
+        onRefresh: () async {
+          _getProductList();
+        },
+        child: Visibility(
+          visible: !_getProductListInProgress,
+          replacement: const Center(
+            child: CircularProgressIndicator(),
+          ),
+          child: ListView.builder(
+            itemCount: productList.length,
+            itemBuilder: (context, index) {
+              return ProductItem(
+                product: productList[index],
+                onDelete: () {
+                  if (productList[index].id != null) {
+                    _deleteProduct(productList[index].id!);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Product ID is null')),
+                    );
+                  }
+                },
+              );
+            },
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -67,7 +74,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   }
 
   Future<void> _getProductList() async {
-    productlist.clear();
+    productList.clear();
     _getProductListInProgress = true;
     setState(() {});
     Uri uri = Uri.parse('https://crud.teamrabbil.com/api/v1/ReadProduct');
@@ -79,40 +86,46 @@ class _ProductListScreenState extends State<ProductListScreen> {
       print(decodedData['status']);
       for (Map<String, dynamic> p in decodedData['data']) {
         Product product = Product(
-            id: p['_id'],
-            ProductName: p['ProductName'],
-            ProductCode: p['ProductCode'],
-            Image: p["Img"],
-            UnitPrice: p['UnitPrice'],
-            Quantity: p['Qty'],
-            TotalPrice: p['TotalPrice'],
-            CreatedDate: p['CreatedDate']);
-        productlist.add(product);
+          id: p['_id'], 
+          ProductName: p['ProductName'],
+          ProductCode: p['ProductCode'],
+          Quantity: p['Qty'],
+          UnitPrice: p['UnitPrice'],
+          Image: p['Img'],
+          TotalPrice: p['TotalPrice'],
+          CreatedDate: p['CreatedDate'],
+        );
+        productList.add(product);
       }
       setState(() {});
     }
     _getProductListInProgress = false;
     setState(() {});
   }
-}
 
   Future<void> _deleteProduct(String productId) async {
-    Uri uri = Uri.parse('https://crud.teamrabbil.com/api/v1/DeleteProduct/$productId');
-    Response response = await delete(
-      uri,
-      headers: {'Content-type': 'application/json'},
-    );
-
-    if (response.statusCode == 200) {
-      setState(() {
-        productlist.removeWhere((product) => product.id == productId);
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Product deleted successfully!')),
+    try {
+      final Response response = await delete(
+        Uri.parse('https://crud.teamrabbil.com/api/v1/DeleteProduct/$productId'),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
       );
-    } else {
+
+      if (response.statusCode == 200) {
+        setState(() {
+          productList.removeWhere((product) => product.id == productId);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Product deleted successfully')),
+        );
+      } else {
+        throw Exception('Failed to delete product.');
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to delete product. Please try again.')),
+        SnackBar(content: Text('Error: $e')),
       );
     }
   }
